@@ -7,7 +7,6 @@ import { Hono } from 'hono'
 import { trimTrailingSlash } from 'hono/trailing-slash'
 import { createElement as h } from 'react'
 import { renderToPipeableStream } from 'react-server-dom-esm/server'
-import { getShip, searchShips } from '../db/ship-api.js'
 import { App } from '../ui/app.js'
 
 const PORT = process.env.PORT || 3000
@@ -22,7 +21,7 @@ app.use(
 	serveStatic({
 		root: './ui',
 		onNotFound: (path, context) => context.text('File not found', 404),
-		rewriteRequestPath: path => path.replace('/ui', ''),
+		rewriteRequestPath: (path) => path.replace('/ui', ''),
 	}),
 )
 
@@ -42,20 +41,18 @@ app.use(async (context, next) => {
 	}
 })
 
-app.get('/rsc/:shipId?', async context => {
+app.get('/rsc/:shipId?', async (context) => {
 	const shipId = context.req.param('shipId') || null
 	const search = context.req.query('search') || ''
 	// 💣 delete the ship and shipResults
-	const ship = shipId ? await getShip({ shipId }) : null
-	const shipResults = await searchShips({ search })
 	// 💣 remove them from the props object too
-	const props = { shipId, search, ship, shipResults }
+	const props = { shipId, search }
 	const { pipe } = renderToPipeableStream(h(App, props))
 	pipe(context.env.outgoing)
 	return RESPONSE_ALREADY_SENT
 })
 
-app.get('/:shipId?', async context => {
+app.get('/:shipId?', async (context) => {
 	const html = await readFile('./public/index.html', 'utf8')
 	return context.html(html, 200)
 })
@@ -65,7 +62,7 @@ app.onError((err, context) => {
 	return context.json({ error: true, message: 'Something went wrong' }, 500)
 })
 
-const server = serve({ fetch: app.fetch, port: PORT }, info => {
+const server = serve({ fetch: app.fetch, port: PORT }, (info) => {
 	const url = `http://localhost:${info.port}`
 	console.log(`🚀  We have liftoff!\n${url}`)
 })
@@ -74,6 +71,6 @@ closeWithGrace(async ({ signal, err }) => {
 	if (err) console.error('Shutting down server due to error', err)
 	else console.log('Shutting down server due to signal', signal)
 
-	await new Promise(resolve => server.close(resolve))
+	await new Promise((resolve) => server.close(resolve))
 	process.exit()
 })
