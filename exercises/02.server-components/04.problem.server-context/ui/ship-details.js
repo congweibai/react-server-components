@@ -1,14 +1,13 @@
 import { createElement as h } from 'react'
 // 💰 you'll need this:
-// import { shipDataStorage } from '../server/async-storage.js'
+import { shipDataStorage } from '../server/async-storage.js'
 import { getShip } from '../db/ship-api.js'
 import { getImageUrlForShip } from './img-utils.js'
 
-export async function ShipDetails(
+export async function ShipDetails() {
 	// 💣 remove the shipId prop
-	{ shipId },
-) {
 	// 🐨 get the shipId from shipDataStorage.getStore()
+	const { shipId } = shipDataStorage.getStore()
 	const ship = await getShip({ shipId })
 	const shipImgSrc = getImageUrlForShip(ship.id, { size: 200 })
 	return h(
@@ -28,7 +27,7 @@ export async function ShipDetails(
 				? h(
 						'ul',
 						null,
-						ship.weapons.map(weapon =>
+						ship.weapons.map((weapon) =>
 							h(
 								'li',
 								{ key: weapon.name },
@@ -50,11 +49,10 @@ export async function ShipDetails(
 	)
 }
 
-export function ShipFallback(
+export function ShipFallback() {
 	// 💣 remove the shipId prop
-	{ shipId },
-) {
 	// 🐨 get the shipId from shipDataStorage.getStore()
+	const { shipId } = shipDataStorage.getStore()
 	return h(
 		'div',
 		{ className: 'ship-info' },
