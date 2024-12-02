@@ -1,4 +1,10 @@
-import { Suspense, createElement as h, startTransition, use } from 'react'
+import {
+	Suspense,
+	createElement as h,
+	startTransition,
+	use,
+	useState,
+} from 'react'
 import { createRoot } from 'react-dom/client'
 import * as RSC from 'react-server-dom-esm/client'
 import { ErrorBoundary } from './error-boundary.js'
@@ -6,6 +12,7 @@ import { shipFallbackSrc } from './img-utils.js'
 import {
 	RouterContext,
 	getGlobalLocation,
+	useLinkHandler,
 	// 💰 you'll need this
 	// useLinkHandler,
 } from './router.js'
@@ -25,14 +32,27 @@ const initialContentPromise = createFromFetch(fetchContent(initialLocation))
 
 function Root() {
 	// 🐨 put this in state so we can update this as the user navigates
-	const location = initialLocation
+	const [location, setLocation] = useState(initialLocation)
 	// 🐨 put this in state so we can update this as the user navigates
-	const contentPromise = initialContentPromise
+	const [contentPromise, setContentPromise] = useState(initialContentPromise)
 
 	// 🐨 this function should accept the nextLocation and an optional options argument
 	// that has a replace option which defaults to false (this will be used to
 	// determine whether we should call replaceState or pushState)
-	function navigate() {
+	function navigate(nextLocation, { replace = false } = {}) {
+		setLocation(nextLocation)
+
+		const nextContentFetchPromise = fetchContent(nextLocation)
+		nextContentFetchPromise.then((response) => {
+			if (replace) {
+				window.history.replaceState({}, '', nextLocation)
+			} else {
+				window.history.pushState({}, '', nextLocation)
+			}
+			return response
+		})
+		const nextContentPromise = createFromFetch(nextContentFetchPromise)
+		startTransition(() => setContentPromise(nextContentPromise))
 		// 🐨 set the location to the nextLocation
 		// 🐨 create a nextContentFetchPromise which is set to fetchContent(nextLocation)
 		// 🐨 add a .then handler to the fetch promise which accepts the response
@@ -44,6 +64,7 @@ function Root() {
 	}
 
 	// 🐨 call useLinkHandler with navigate so all links will navigate when clicked
+	useLinkHandler(navigate)
 
 	return h(
 		RouterContext,
