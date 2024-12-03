@@ -3,9 +3,11 @@ import {
 	createElement as h,
 	startTransition,
 	use,
+	useDeferredValue,
 	// 💰 you'll need this
 	// useDeferredValue,
 	useState,
+	useTransition,
 	// 💰 you'll need this
 	// useTransition,
 } from 'react'
@@ -30,17 +32,19 @@ const initialContentPromise = createFromFetch(fetchContent(initialLocation))
 
 function Root() {
 	// 🐨 change this to nextLocation
-	const [location, setLocation] = useState(initialLocation)
+	const [nextLocation, setNextLocation] = useState(initialLocation)
 	const [contentPromise, setContentPromise] = useState(initialContentPromise)
 	// 🐨 call useTransition here to get isPending and startTransition
+	const [isPending, startTransition] = useTransition()
 
 	// 🐨 create a location variable set to useDeferredValue of the nextLocation
+	const location = useDeferredValue(nextLocation)
 
 	function navigate(nextLocation, { replace = false } = {}) {
-		setLocation(nextLocation)
+		setNextLocation(nextLocation)
 
 		const nextContentPromise = createFromFetch(
-			fetchContent(nextLocation).then(response => {
+			fetchContent(nextLocation).then((response) => {
 				if (replace) {
 					window.history.replaceState({}, '', nextLocation)
 				} else {
@@ -61,6 +65,8 @@ function Root() {
 			value: {
 				navigate,
 				location,
+				nextLocation,
+				isPending,
 				// 🐨 add the nextLocation and isPending to this context value
 			},
 		},
