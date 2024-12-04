@@ -12,7 +12,7 @@ import {
 import { createRoot } from 'react-dom/client'
 import * as RSC from 'react-server-dom-esm/client'
 // 💰 you're going to need this
-// import { contentCache, useContentCache, generateKey } from './content-cache.js'
+import { contentCache, useContentCache, generateKey } from './content-cache.js'
 import { ErrorBoundary } from './error-boundary.js'
 import { shipFallbackSrc } from './img-utils.js'
 import { RouterContext, getGlobalLocation, useLinkHandler } from './router.js'
@@ -30,23 +30,32 @@ function createFromFetch(fetchPromise) {
 const initialLocation = getGlobalLocation()
 const initialContentPromise = createFromFetch(fetchContent(initialLocation))
 
+let initialContentKey = window.history.state?.key
+
+if (!initialContentKey) {
+	initialContentKey = generateKey()
+	window.history.replaceState({ key: initialContentKey }, '', initialLocation)
+}
+
 // 🐨 create an initialContentKey here assigned to window.history.state?.key
 // 🐨 if there's no initialContentKey
 //   - set it to a new generated one with generateKey
 //   - call window.history.replaceState with the initialContentKey
-
+contentCache.set(initialContentKey, initialContentPromise)
 // 🐨 use the initialContentKey to add the initialContentPromise in the contentCache
 
 function Root() {
 	const latestNav = useRef(null)
 	// 🐨 get the contentCache from useContentCache
+	const contentCache = useContentCache()
 	const [nextLocation, setNextLocation] = useState(getGlobalLocation)
 	// 🐨 change this to contentKey
-	const [contentPromise, setContentPromise] = useState(initialContentPromise)
+	const [contentKey, setContentKey] = useState(initialContentKey)
 	const [isPending, startTransition] = useTransition()
 
 	const location = useDeferredValue(nextLocation)
 	// 🐨 get the contentPromise from the contentCache by the contentKey
+	const contentPromise = contentCache.get(contentKey)
 
 	useEffect(() => {
 		function handlePopState() {
@@ -54,13 +63,17 @@ function Root() {
 			setNextLocation(nextLocation)
 			// 🐨 get the historyKey from window.history.state?.key (or fallback to a new one with generateKey)
 
+			const historyKey = window.history.state?.key || generateKey()
 			// 🐨 if the contentCache does not have an entry for the historyKey, then trigger this update:
-			const fetchPromise = fetchContent(nextLocation)
-			const nextContentPromise = createFromFetch(fetchPromise)
+			if (!contentCache.has(historyKey)) {
+				const fetchPromise = fetchContent(nextLocation)
+				const nextContentPromise = createFromFetch(fetchPromise)
+				contentCache.set(historyKey, nextContentPromise)
+			}
 			// 🐨 use the historyKey to add the nextContentPromise in the contentCache
 
 			// 🐨 change this to setContentKey(historyKey)
-			startTransition(() => setContentPromise(nextContentPromise))
+			startTransition(() => setContentKey(historyKey))
 		}
 		window.addEventListener('popstate', handlePopState)
 		return () => window.removeEventListener('popstate', handlePopState)
@@ -72,15 +85,16 @@ function Root() {
 		latestNav.current = thisNav
 
 		// 🐨 create a nextContentKey with generateKey()
+		const newContentKey = generateKey()
 		const nextContentPromise = createFromFetch(
-			fetchContent(nextLocation).then(response => {
+			fetchContent(nextLocation).then((response) => {
 				if (thisNav !== latestNav.current) return
 				if (replace) {
 					// 🐨 add a key property here
-					window.history.replaceState({}, '', nextLocation)
+					window.history.replaceState({ key: newContentKey }, '', nextLocation)
 				} else {
 					// 🐨 add a key property here
-					window.history.pushState({}, '', nextLocation)
+					window.history.pushState({ key: newContentKey }, '', nextLocation)
 				}
 				return response
 			}),
@@ -88,8 +102,9 @@ function Root() {
 
 		// 🐨 use the nextContentKey to add the nextContentPromise in the contentCache
 
+		contentCache.set(newContentKey, nextContentPromise)
 		// 🐨 update this to setContentKey(newContentKey)
-		startTransition(() => setContentPromise(nextContentPromise))
+		startTransition(() => setContentKey(newContentKey))
 	}
 
 	useLinkHandler(navigate)
